@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { useAtom } from 'jotai';
 import {
   Check,
   ChevronLeft,
@@ -14,7 +15,6 @@ import {
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import React from 'react';
-import { FaXTwitter } from 'react-icons/fa6';
 import { toast } from 'sonner';
 
 import {
@@ -24,18 +24,24 @@ import {
   BreadcrumbList,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { PROJECT_NAME } from '@/constants/project';
+// import { PROJECT_NAME } from '@/constants/project';
 import { tokenList } from '@/constants/tokenList';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { useDisclosure } from '@/hooks/use-disclosure';
 import { api } from '@/lib/api';
 import { getBountyUrl } from '@/utils/bounty-urls';
 import { cn } from '@/utils/cn';
-import { tweetEmbedLink } from '@/utils/socialEmbeds';
-import { getURL } from '@/utils/validUrl';
 
+// import { tweetEmbedLink } from '@/utils/socialEmbeds';
+// import { getURL } from '@/utils/validUrl';
 import { type Listing } from '@/features/listings/types';
 import {
   formatDeadline,
@@ -45,11 +51,95 @@ import { getColorStyles } from '@/features/listings/utils/getColorStyles';
 import { getListingIcon } from '@/features/listings/utils/getListingIcon';
 import { getListingStatus } from '@/features/listings/utils/status';
 
+import { selectedSubmissionAtom } from '../../atoms';
 import { useCompleteSponsorship } from '../../mutations/useCompleteSponsorship';
 import { ListingStatusModal } from '../ListingStatusModal';
 import { SponsorPrize } from '../SponsorPrize';
 import { CompleteSponsorshipModal } from './Modals/CompleteSponsorshipModal';
 import { DeleteRestoreListingModal } from './Modals/DeleteRestoreListingModal';
+
+interface CopyLinkModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  listingLink: string;
+  submissionLink: string | undefined;
+}
+
+const CopyLinkModal = ({
+  isOpen,
+  onClose,
+  listingLink,
+  submissionLink,
+}: CopyLinkModalProps) => {
+  const { hasCopied: hasCopiedListing, onCopy: onCopyListing } =
+    useClipboard(listingLink);
+  const { hasCopied: hasCopiedSubmission, onCopy: onCopySubmission } =
+    useClipboard(submissionLink ?? '');
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="w-[480px] gap-6 overflow-hidden rounded-lg p-6">
+        <DialogHeader>
+          <DialogTitle>Copy Link</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700">
+              Listing Link
+            </p>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Link2 className="h-4 w-4 text-slate-400" />
+              </div>
+              <Input
+                className="w-full overflow-hidden text-ellipsis whitespace-nowrap border-slate-100 pl-10 pr-10 text-slate-500 focus-visible:ring-[#CFD2D7] focus-visible:ring-offset-0"
+                readOnly
+                value={listingLink}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {hasCopiedListing ? (
+                  <Check className="h-4 w-4 text-slate-400" />
+                ) : (
+                  <Copy
+                    className="h-5 w-5 cursor-pointer text-slate-400"
+                    onClick={onCopyListing}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+          {submissionLink && (
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">
+                Submission Link
+              </p>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                  <Link2 className="h-4 w-4 text-slate-400" />
+                </div>
+                <Input
+                  className="w-full overflow-hidden text-ellipsis whitespace-nowrap border-slate-100 pl-10 pr-10 text-slate-500 focus-visible:ring-[#CFD2D7] focus-visible:ring-offset-0"
+                  readOnly
+                  value={submissionLink}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {hasCopiedSubmission ? (
+                    <Check className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <Copy
+                      className="h-5 w-5 cursor-pointer text-slate-400"
+                      onClick={onCopySubmission}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 interface Props {
   bounty: Listing | undefined;
@@ -83,26 +173,39 @@ export const SubmissionHeader = ({
     onClose: deleteModalOnClose,
   } = useDisclosure();
 
+  const {
+    isOpen: copyLinkModalOpen,
+    onOpen: copyLinkModalOnOpen,
+    onClose: copyLinkModalOnClose,
+  } = useDisclosure();
+
+  const [selectedSubmission] = useAtom(selectedSubmissionAtom);
+
   const deadline = formatDeadline(bounty?.deadline, bounty?.type);
 
   const listingPath = getBountyUrl(bounty);
-  const { hasCopied, onCopy } = useClipboard(`${listingPath}`);
+  const submissionPath =
+    selectedSubmission &&
+    selectedSubmission.listingId === bounty?.id &&
+    bounty?.type === 'sponsorship'
+      ? `${listingPath}/${selectedSubmission.sequentialId}`
+      : undefined;
 
   const bountyStatus = getListingStatus(bounty);
 
-  const listingLink =
-    bounty?.type === 'grant'
-      ? `${getURL()}grants/${bounty.slug}/`
-      : getBountyUrl(bounty);
+  // const listingLink =
+  // bounty?.type === 'grant'
+  // ? `${getURL()}grants/${bounty.slug}/`
+  // : getBountyUrl(bounty);
 
-  const socialListingLink = (medium?: 'twitter' | 'telegram') =>
-    `${listingLink}${medium ? `?utm_source=${PROJECT_NAME}&utm_medium=${medium}&utm_campaign=sharelisting/` : ``}`;
+  // const socialListingLink = (medium?: 'twitter' | 'telegram') =>
+  // `${listingLink}${medium ? `?utm_source=${PROJECT_NAME}&utm_medium=${medium}&utm_campaign=sharelisting/` : ``}`;
 
-  const tweetShareContent = `Check out my newly added @${PROJECT_NAME} opportunity!
-
-${socialListingLink('twitter')}
-`;
-  const twitterShareLink = tweetEmbedLink(tweetShareContent);
+  // const tweetShareContent = `Check out my newly added @${PROJECT_NAME} opportunity!
+  //
+  // ${socialListingLink('twitter')}
+  // `;
+  // const twitterShareLink = tweetEmbedLink(tweetShareContent);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -162,6 +265,12 @@ ${socialListingLink('twitter')}
         onClose={deleteModalOnClose}
         listing={bounty}
         onSuccess={() => refetchBounty()}
+      />
+      <CopyLinkModal
+        isOpen={copyLinkModalOpen}
+        onClose={copyLinkModalOnClose}
+        listingLink={listingPath}
+        submissionLink={submissionPath}
       />
       <div className="mb-2">
         <Breadcrumb className="text-slate-400">
@@ -318,37 +427,23 @@ ${socialListingLink('twitter')}
           </div>
         </div>
         <div className="ml-auto">
-          <p className="text-slate-500">Share</p>
+          <br />
           <div className="mt-2 flex items-center gap-4">
-            <div className="relative border-slate-100 bg-slate-50">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                <Link2 className="h-4 w-4 text-slate-400" />
-              </div>
-
-              <Input
-                className="w-80 overflow-hidden text-ellipsis whitespace-nowrap border-slate-100 pl-10 pr-10 text-slate-500 focus-visible:ring-[#CFD2D7] focus-visible:ring-offset-0"
-                readOnly
-                value={`${listingPath}`}
-              />
-
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                {hasCopied ? (
-                  <Check className="h-4 w-4 text-slate-400" />
-                ) : (
-                  <Copy
-                    className="h-5 w-5 cursor-pointer text-slate-400"
-                    onClick={onCopy}
-                  />
-                )}
-              </div>
-            </div>
-            <Link
+            <Button
+              variant="ghost"
+              className="text-slate-400"
+              onClick={copyLinkModalOnOpen}
+            >
+              <Link2 className="h-4 w-4" />
+              Public Links
+            </Button>
+            {/* <Link
               className="flex h-fit w-fit items-center gap-1 rounded-full bg-slate-500 p-1.5 text-white hover:bg-slate-400"
               href={twitterShareLink}
               target="_blank"
             >
               <FaXTwitter style={{ width: '0.9rem', height: '0.8rem' }} />
-            </Link>
+            </Link> */}
           </div>
         </div>
       </div>

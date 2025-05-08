@@ -3,7 +3,6 @@ import { useAtom } from 'jotai';
 import {
   AlertTriangle,
   ArrowRight,
-  Copy,
   DollarSign,
   ExternalLink,
   Pencil,
@@ -18,7 +17,6 @@ import { KycComponent } from '@/components/ui/KycComponent';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useClipboard } from '@/hooks/use-clipboard';
 import type { SubmissionWithUser } from '@/interface/submission';
-import { getSubmissionUrl } from '@/utils/bounty-urls';
 import { cn } from '@/utils/cn';
 import { dayjs } from '@/utils/dayjs';
 import { formatNumberWithSuffix } from '@/utils/formatNumberWithSuffix';
@@ -83,18 +81,18 @@ export const SubmissionPanel = ({
     selectedSubmission?.user?.publicKey || '',
   );
 
-  const { onCopy: onCopySubmissionLink } = useClipboard(
-    getSubmissionUrl(selectedSubmission, bounty),
-  );
+  // const { onCopy: onCopySubmissionLink } = useClipboard(
+  //   getSubmissionUrl(selectedSubmission, bounty),
+  // );
 
-  const handleCopySubmissionLink = () => {
-    if (selectedSubmission?.id) {
-      onCopySubmissionLink();
-      toast.success('Submission link copied', {
-        duration: 1500,
-      });
-    }
-  };
+  // const handleCopySubmissionLink = () => {
+  //   if (selectedSubmission?.id) {
+  //     onCopySubmissionLink();
+  //     toast.success('Submission link copied', {
+  //       duration: 1500,
+  //     });
+  //   }
+  // };
   const handleCopyEmail = () => {
     if (selectedSubmission?.user?.email) {
       onCopyEmail();
@@ -151,7 +149,7 @@ export const SubmissionPanel = ({
                     'ph-no-capture flex w-full items-center justify-end gap-2'
                   }
                 >
-                  {isSponsorship && (
+                  {/* {isSponsorship && (
                     <Button
                       variant="ghost"
                       className="ph-no-capture text-slate-500 disabled:cursor-not-allowed"
@@ -160,7 +158,7 @@ export const SubmissionPanel = ({
                       <Copy className="mr-1 h-4 w-4" />
                       Copy Link
                     </Button>
-                  )}
+                  )} */}
                   {selectedSubmission?.isWinner &&
                     selectedSubmission?.winnerPosition &&
                     !selectedSubmission?.isPaid &&
